@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AXIOM — Optics Virtual Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- ==================== HOMEPAGE ==================== -->
+<div id="home" class="scr on">
+  <canvas id="hpStars"></canvas>
+  <div class="neb nb1"></div><div class="neb nb2"></div>
+  <span class="deco" style="width:10px;height:10px;background:var(--warn);top:22%;left:12%;opacity:.8"></span>
+  <span class="deco" style="width:6px;height:6px;background:var(--acc);top:64%;left:7%"></span>
+  <span class="deco" style="width:14px;height:14px;background:var(--acc2);top:75%;right:10%;opacity:.7"></span>
+  <span class="deco" style="width:7px;height:7px;background:var(--ok);top:30%;right:16%"></span>
+
+  <div class="hp-top">
+    <button class="cbtn" onclick="toggleDrawer()" title="Menu">☰</button>
+    <button id="avatar" onclick="toast('Mode tamu — tanpa akun, data tersimpan lokal')">G</button>
+  </div>
+
+  <div class="hp-head">
+    <h1>Axiom<br><em>Optics Lab</em></h1>
+    <div class="sub">OPTICS VIRTUAL LAB · OPEN ACCESS</div>
+  </div>
+
+  <div class="car-zone">
+    <div class="car-track" id="carTrack"></div>
+  </div>
+
+  <div class="hp-foot">
+    <div class="dots" id="hpDots"></div>
+    <small>© 2025 AXIOM · OPTICS ENGINE 60HZ · DATA LOKAL</small>
+  </div>
+
+  <div id="drawer">
+    <h3>Menu</h3>
+    <button class="mi" onclick="toggleDrawer();enterLab()"><span>🔬</span> Masuk Meja Optik</button>
+    <button class="mi" onclick="toggleDrawer();toggleFS()"><span>⛶</span> Fullscreen</button>
+    <div class="langSeg">
+      <button id="lgID" class="on">🇮🇩 ID</button><button id="lgEN">🇺🇸 EN</button>
+    </div>
+    <div style="margin-top:auto;font-size:10.5px;color:var(--dim);line-height:1.8">
+      Laboratorium optik virtual terbuka untuk siapa pun. Tanpa akun, tanpa instalasi — seluruh eksperimen berjalan lokal di perangkat Anda.
+    </div>
+  </div>
+</div>
+
+<!-- ==================== LAB ==================== -->
+<div id="lab" class="scr">
+  <canvas id="bench"></canvas>
+
+  <div id="tcol"></div>
+
+  <div id="labTL">
+    <button class="cbtn" onclick="goHome()" title="Kembali">←</button>
+    <button class="cbtn" onclick="toggleDrawerLab()" title="Parameter eksperimen">🎛</button>
+  </div>
+  <div id="labTR">
+    <button class="cbtn" onclick="togglePop('pMode')" title="Daftar eksperimen">⚡</button>
+    <button class="cbtn" onclick="togglePop('pLaser')" title="Warna laser">🎨</button>
+  </div>
+
+  <div id="pMode" class="g pop">
+    <div class="pt">EKSPERIMEN — MODUL PEMANTULAN</div>
+    <div id="expList"></div>
+    <div class="pt">MODUL OPTIK LAINNYA</div>
+    <div id="soonList"></div>
+  </div>
+  <div id="pLaser" class="g pop">
+    <div class="pt">WARNA LASER</div>
+    <div id="laserList"></div>
+  </div>
+
+  <div id="pDrawer">
+    <div class="dHead">
+      <span>Parameter Eksperimen</span>
+      <button class="x" onclick="toggleDrawerLab()" title="Tutup panel">✕</button>
+    </div>
+    <div id="presetSec" style="display:none">
+      <div class="ph">PRESET APLIKASI</div>
+      <div class="presetRow" id="presetRow"></div>
+    </div>
+    <div id="tanSec" style="display:none">
+      <div class="ph">MODE TANTANGAN</div>
+      <button class="mbtn" style="width:100%" onclick="startChallenge()">🎯 Beri saya tebakan bayangan!</button>
+    </div>
+    <div class="ph">PARAMETER</div>
+    <div id="paramList"></div>
+    <div class="ph">OVERLAY & OPSI</div>
+    <div id="ovlList"></div>
+  </div>
+
+  <div id="labRail" class="g">
+    <button class="cbtn" title="Grafik" onclick="openPanel('grafik')">📊</button>
+    <button class="cbtn" title="Solver" onclick="openPanel('kalkulator')">🧮</button>
+    <button class="cbtn" title="AI Assistant" onclick="openPanel('ai')">🤖</button>
+    <button class="cbtn" title="Riwayat" onclick="openPanel('riwayat')">🕓</button>
+  </div>
+
+  <div id="console" class="g"><h5>ANALISIS OTOMATIS</h5><p id="conTxt"></p><div class="mis" id="conMis" style="display:none"></div></div>
+
+  <div id="labHint">SPACE ⏯ · R ↺ · ←→ ⏱ · ? BANTUAN</div>
+  <div id="dock" class="g">
+    <button class="dbtn" onclick="resetRun()" title="Reset (R)">⏮</button>
+    <div class="playWrap">
+      <svg viewBox="0 0 62 62"><circle class="bgc" cx="31" cy="31" r="28"/><circle class="fgc" id="ring" cx="31" cy="31" r="28"/></svg>
+      <button id="btnPlay" onclick="playPause()" title="Jalankan / Rekam Data">▶</button>
+    </div>
+    <button class="dbtn" onclick="stepFrame()" title="Step">⏭</button>
+    <input type="range" id="scrub" min="0" max="0" value="0" disabled>
+    <span class="tme" id="tmeWrap"><b id="tCur">0.0</b>/<span id="tTot">0.0</span><span id="tUnit">ns</span></span>
+    <select id="selSpd"><option value="0.5">0.5×</option><option value="1" selected>1.0×</option><option value="2">2.0×</option><option value="4">4.0×</option></select>
+  </div>
+  <div id="labBR">
+    <button class="cbtn" onclick="showKeys()" title="Bantuan">?</button>
+    <button class="cbtn" id="btnRec" onclick="toggleRec()" title="Rekam (.webm)">📹</button>
+    <button class="cbtn" id="btnSnd" onclick="toggleSnd()" title="Suara">🔊</button>
+    <button class="cbtn" onclick="toggleFS()" title="Fullscreen (F)">⛶</button>
+  </div>
+</div>
+
+<!-- ==================== PANEL KANAN ==================== -->
+<div id="panel">
+  <div id="pHead">
+    <button class="tab on" data-t="grafik" onclick="openPanel('grafik')">📊 GRAFIK</button>
+    <button class="tab" data-t="kalkulator" onclick="openPanel('kalkulator')">🧮 SOLVER</button>
+    <button class="tab" data-t="ai" onclick="openPanel('ai')">🤖 AI</button>
+    <button class="tab" data-t="riwayat" onclick="openPanel('riwayat')">🕓 LOG</button>
+    <button class="x" onclick="closePanel()">✕</button>
+  </div>
+  <div id="pb-grafik" class="pBody on">
+    <div class="stat3" id="gStats"></div>
+    <canvas class="gch" id="ch1"></canvas>
+    <canvas class="gch" id="ch2"></canvas>
+    <div class="rowb"><button class="mbtn" onclick="expGraph()">⬇ Export data (.csv)</button></div>
+  </div>
+  <div id="pb-kalkulator" class="pBody">
+    <p style="font-size:11.5px;color:var(--dim);margin-bottom:12px" id="calcDesc"></p>
+    <div id="calcInputs"></div>
+    <button class="goBtn" onclick="doCalc()">🧠 Hitung Otomatis</button>
+    <div class="fBox" id="calcForm"></div>
+    <div id="calcOuts"></div>
+  </div>
+  <div id="pb-ai" class="pBody aic">
+    <div id="aiCtx"></div>
+    <div style="flex:1;overflow-y:auto;min-height:0" id="aiMsgs"></div>
+    <div id="aiChips"></div>
+    <div class="aiIn">
+      <input id="aiIn" placeholder="Tanya konsep, rumus, hasil…" onkeydown="if(event.key==='Enter')aiSend()">
+      <button onclick="aiSend()">➤</button>
+    </div>
+  </div>
+  <div id="pb-riwayat" class="pBody">
+    <div class="rowb" style="margin-bottom:12px">
+      <button class="mbtn" onclick="expHist()">⬇ Export .csv</button>
+      <button class="mbtn danger" onclick="clrHist()">🗑 Hapus</button>
+    </div>
+    <table class="ht"><thead><tr><th>WAKTU</th><th>EKSP</th><th>PARAM</th><th>STATUS</th></tr></thead><tbody id="histBody"></tbody></table>
+  </div>
+</div>
+
+<!-- ==================== OVERLAYS ==================== -->
+<div class="ovl" id="ovlWelcome"><div class="mcard2">
+  <div class="ic2">🪞</div>
+  <h2>Selamat Datang di Meja Optik</h2>
+  <p>Modul <b>Pemantulan Cahaya</b> berisi 7 eksperimen bertahap — dari hukum dasar pada cermin datar, baur vs teratur, kaleidoskop, cermin cekung & cembung dengan ray diagram otomatis, verifikasi rumus, hingga aplikasi nyata.<br><br>Buka panel ⚡ untuk memilih eksperimen, 🎛 untuk parameter. Tekan <kbd>?</kbd> kapan saja.</p>
+  <button class="pri" onclick="hideOvl('ovlWelcome');showTutor()">Mulai Tutorial</button>
+  <button class="gho" onclick="hideOvl('ovlWelcome')">Lewati</button>
+</div></div>
+
+<div class="ovl" id="ovlTutor"><div class="mcard2">
+  <div class="ic2">❓</div>
+  <h2 id="tutTitle">Tutorial</h2>
+  <p id="tutText"></p>
+  <button class="gho" onclick="hideOvl('ovlTutor')">Berhenti</button>
+  <button class="pri" onclick="hideOvl('ovlTutor')">Mulai Eksperimen</button>
+</div></div>
+
+<div class="ovl" id="ovlKeys"><div class="mcard2">
+  <div class="ic2">⌨️</div>
+  <h2>Keyboard Shortcuts</h2>
+  <div class="keys">
+    <span>Jalankan / Rekam data</span><kbd>Space</kbd>
+    <span>Reset</span><kbd>R</kbd>
+    <span>Geser foton</span><kbd>← →</kbd>
+    <span>Fullscreen</span><kbd>F</kbd>
+    <span>Bantuan</span><kbd>?</kbd>
+    <span>Tutup panel/overlay</span><kbd>Esc</kbd>
+  </div>
+  <button class="pri" onclick="hideOvl('ovlKeys')">Mengerti</button>
+</div></div>
+
+<div class="ovl" id="ovlTan"><div class="mcard2">
+  <div class="ic2">🎯</div>
+  <h2>Mode Tantangan</h2>
+  <div class="tanBox" id="tanDesc"></div>
+  <div class="res" id="tanRes" style="display:none"></div>
+  <p id="tanHint" style="display:none"></p>
+  <p style="font-size:11.5px">Atur <b>jarak benda s</b> pada drawer 🎛 sesuai dugaanmu, lalu periksa.</p>
+  <button class="pri" onclick="checkChallenge()">Periksa Jawaban</button>
+  <button class="gho" onclick="hideOvl('ovlTan')">Nanti Saja</button>
+</div></div>
+
+<div id="toast"></div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
