@@ -8,9 +8,8 @@ import {resetRun,updateHUD} from './engine.js';
 import {renderParams} from './uilab.js';
 
 export function startChallenge(){
- const ids=['CEKUNG','CEMBUNG','KUANTA','APLIKASI'];
- if(!ids.includes(S.exp)){toast('Mode tantangan tersedia untuk cermin lengkung');return}
- const convex=S.exp==='CEMBUNG'||(S.exp==='APLIKASI'&&S.preset==='spion');
+ if(S.exp!=='CEKUNG'&&S.exp!=='CEMBUNG'){toast('Mode tantangan tersedia untuk cermin lengkung');return}
+ const convex=S.exp==='CEMBUNG';
  const R=+(2+Math.random()*8).toFixed(1);
  const f=R/2;
  let s_t;
@@ -31,7 +30,6 @@ export function startChallenge(){
  $('tanRes').style.display='none';$('tanHint').style.display='none';
  showOvl('ovlTan');
 }
-
 export function checkChallenge(){
  if(!S.tan)return;
  const d=Math.abs(S.p[S.exp].s-S.tan.s_t);

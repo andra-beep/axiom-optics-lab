@@ -1,7 +1,7 @@
 /* ============================================================
-   AXIOM | home.js — carousel tak berujung, bintang, drawer
+   AXIOM | home.js — carousel, routing (back HP), pemilih mode
    ============================================================ */
-import {$,sfx,store,toast,showOvl} from './core.js';
+import {$,sfx,store,toast,showOvl,hideOvl} from './core.js';
 import {MODULES} from './config.js';
 import {S} from './state.js';
 import {resetRun} from './engine.js';
@@ -57,7 +57,35 @@ export function restartAuto(){clearInterval(window._auto);
  window._auto=setInterval(()=>{if(!document.hidden&&$('home').classList.contains('on'))moveMod(1)},5200)}
 export function modEnter(ri){const m=MODULES[ri];
  if(!m.live){toast('Modul '+m.name+' sedang dibangun 🔒');return}
- sfx.start();enterLab()}
+ showOvl('ovlMode')}
+
+/* ---------- ROUTING (#/ home · #/lab chamber) ----------
+   Tombol back HP/gesture browser berfungsi seperti app native. */
+export function enterLab(){
+ _showLab();
+ if(location.hash!=='#/lab')location.hash='#/lab';
+}
+export function goHome(){location.hash='#/'}
+export function route(){
+ if(location.hash==='#/lab')_showLab();else _showHome();
+}
+function _showLab(){
+ $('drawer').classList.remove('open');
+ $('home').classList.remove('on');$('lab').classList.add('on');
+ fitScene();resetRun(true);
+}
+function _showHome(){
+ sfx.click();
+ $('lab').classList.remove('on');$('home').classList.add('on');
+ resetRun(true);
+}
+addEventListener('hashchange',route);
+
+/* ---------- PEMILIH MODE ---------- */
+export function chooseMode(m){
+ S.appMode=m;store.set('mode',m);hideOvl('ovlMode');enterLab();
+}
+export function askMode(){showOvl('ovlMode')}
 
 document.addEventListener('keydown',e=>{
  if($('home').classList.contains('on')&&!/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)){
@@ -78,9 +106,3 @@ fitFx();addEventListener('resize',fitFx);
  requestAnimationFrame(fxLoop)})();
 
 export function toggleDrawer(){$('drawer').classList.toggle('open')}
-export function enterLab(){
- $('drawer').classList.remove('open');
- $('home').classList.remove('on');$('lab').classList.add('on');
- fitScene();resetRun(true);
- if(!S.welcomed){S.welcomed=true;store.set('welcomed',true);setTimeout(()=>showOvl('ovlWelcome'),400)}}
-export function goHome(){sfx.click();$('lab').classList.remove('on');$('home').classList.add('on');resetRun(true)}

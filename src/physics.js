@@ -18,5 +18,9 @@ export function curvedCalc(p,convex){
  return{f,fAbs:p.R/2,inf:false,sPrime:sp,M,hp,
   real:sp>0,tegak:hp>0,size}}
 
-export function physDatar(p){const th=Math.abs(p.i-p.al),be=p.i-2*p.al;
- return{th,be,path:2*p.L,tns:2*p.L/C*1e9,hitTarget:Math.abs(((be-p.phi+540)%360)-180)<3}}
+/* cermin datar — i = sudut laser dari NORMAL (−90…+90; 0 = sepanjang normal).
+   θᵢ sebenarnya = |i|. Laser selalu di sisi depan cermin (posisi di scene). */
+export function physDatar(p){
+ const i=Math.min(Math.max(+(p.i||0),-90),90);
+ const th=Math.abs(i);
+ return{th,be:th,path:2*p.L,tns:2*p.L/C*1e9}}

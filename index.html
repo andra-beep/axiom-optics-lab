@@ -38,7 +38,7 @@
 
   <div id="drawer">
     <h3>Menu</h3>
-    <button class="mi" onclick="toggleDrawer();enterLab()"><span>🔬</span> Masuk Meja Optik</button>
+    <button class="mi" onclick="toggleDrawer();askMode()"><span>🔬</span> Masuk Meja Optik</button>
     <button class="mi" onclick="toggleDrawer();toggleFS()"><span>⛶</span> Fullscreen</button>
     <div class="langSeg">
       <button id="lgID" class="on">🇮🇩 ID</button><button id="lgEN">🇺🇸 EN</button>
@@ -90,6 +90,8 @@
     </div>
     <div class="ph">PARAMETER</div>
     <div id="paramList"></div>
+      <div class="ph">PENGATURAN</div>
+      <button class="mbtn" style="width:100%" onclick="resetParams()">↺ Reset semua parameter</button>
     <div class="ph">OVERLAY & OPSI</div>
     <div id="ovlList"></div>
   </div>
@@ -101,7 +103,7 @@
     <button class="cbtn" title="Riwayat" onclick="openPanel('riwayat')">🕓</button>
   </div>
 
-  <div id="console" class="g"><h5>ANALISIS OTOMATIS</h5><p id="conTxt"></p><div class="mis" id="conMis" style="display:none"></div></div>
+  <div id="console" class="g"><div class="ch"><h5>ANALISIS OTOMATIS</h5><button class="cx" onclick="closeConsole()" title="Tutup">✕</button></div><p id="conTxt"></p><div class="mis" id="conMis" style="display:none"></div></div>
 
   <div id="labHint">SPACE ⏯ · R ↺ · ←→ ⏱ · ? BANTUAN</div>
   <div id="dock" class="g">
@@ -126,10 +128,10 @@
 <!-- ==================== PANEL KANAN ==================== -->
 <div id="panel">
   <div id="pHead">
-    <button class="tab on" data-t="grafik" onclick="openPanel('grafik')">📊 GRAFIK</button>
-    <button class="tab" data-t="kalkulator" onclick="openPanel('kalkulator')">🧮 SOLVER</button>
-    <button class="tab" data-t="ai" onclick="openPanel('ai')">🤖 AI</button>
-    <button class="tab" data-t="riwayat" onclick="openPanel('riwayat')">🕓 LOG</button>
+    <button class="tab on" data-t="grafik" onclick="openPanel('grafik')">📊Grafik</button>
+    <button class="tab" data-t="kalkulator" onclick="openPanel('kalkulator')">🧮Kalkulator</button>
+    <button class="tab" data-t="ai" onclick="openPanel('ai')">🤖AXIOM AI</button>
+    <button class="tab" data-t="riwayat" onclick="openPanel('riwayat')">🕓Riwayat</button>
     <button class="x" onclick="closePanel()">✕</button>
   </div>
   <div id="pb-grafik" class="pBody on">
@@ -155,11 +157,12 @@
     </div>
   </div>
   <div id="pb-riwayat" class="pBody">
-    <div class="rowb" style="margin-bottom:12px">
-      <button class="mbtn" onclick="expHist()">⬇ Export .csv</button>
-      <button class="mbtn danger" onclick="clrHist()">🗑 Hapus</button>
+    <div style="font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--dim);margin-bottom:8px">RIWAYAT EKSPERIMEN — <span id="hExp" style="color:var(--acc)">DATAR</span></div>
+    <div style="overflow-x:auto"><table class="ht"><thead id="hHead"></thead><tbody id="hBody"></tbody></table></div>
+    <div class="rowb" style="margin-top:12px">
+      <button class="mbtn" onclick="expHist()">⬇ Export (.csv)</button>
+      <button class="mbtn danger" onclick="clrHist()">🗑 Clear Data</button>
     </div>
-    <table class="ht"><thead><tr><th>WAKTU</th><th>EKSP</th><th>PARAM</th><th>STATUS</th></tr></thead><tbody id="histBody"></tbody></table>
   </div>
 </div>
 
@@ -203,6 +206,14 @@
   <p style="font-size:11.5px">Atur <b>jarak benda s</b> pada drawer 🎛 sesuai dugaanmu, lalu periksa.</p>
   <button class="pri" onclick="checkChallenge()">Periksa Jawaban</button>
   <button class="gho" onclick="hideOvl('ovlTan')">Nanti Saja</button>
+</div></div>
+
+<div class="ovl" id="ovlMode"><div class="mcard2">
+  <div class="ic2">🧭</div>
+  <h2>Pilih Mode Pembelajaran</h2>
+  <p style="text-align:center">Bagaimana kamu ingin menggunakan lab ini?</p>
+  <button class="pri" onclick="chooseMode('free')">🧪 Eksperimen Bebas<small style="display:block;font-weight:500;font-size:11px;margin-top:3px;opacity:.75">Jelajahi semua eksperimen secara bebas</small></button>
+  <button class="gho" onclick="chooseMode('guided')">📚 Pembelajaran Terbimbing (LKPD)<small style="display:block;font-weight:500;font-size:11px;margin-top:3px;opacity:.6">Inkuiri terbimbing berurutan — variabel, data, analisis</small></button>
 </div></div>
 
 <div id="toast"></div>

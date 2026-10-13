@@ -5,8 +5,10 @@ import {$,fmt,clamp,FDT,DUR,store,sfx,toast} from './core.js';
 import {EXPS} from './config.js';
 import {S,P,noisy} from './state.js';
 import {kaleidoN,curvedCalc,physDatar} from './physics.js';
-import {drawScene,spawnBurst,trailPts,burst} from './scene.js';
-import {addHist,drawCharts} from './panels.js';
+import {drawScene,spawnBurst,trailPts,burst,positionConsole} from './scene.js';
+import {addHist,drawCharts,renderDataTable,renderHist} from './panels.js';
+
+const PRESET_NAMES={spion:'Spion (cembung)',reflektor:'Reflektor (cekung)',teleskop:'Teleskop (cekung)'};
 
 export function playPause(){
  if(S.finished){startRun();return}
@@ -26,9 +28,9 @@ export function resetRun(silent){
 export function analyzeExp(){
  const p=P(),e=S.exp;let txt='',mis='',hit=null;
  if(e==='DATAR'){
-  const ph=physDatar(p);hit=ph.hitTarget;
-  txt=`θᵢ = ${fmt(ph.th,1)}° = θᵣ ✓ Hukum Pemantulan terverifikasi. β = i − 2α = ${fmt(ph.be,1)}°. Foton menempuh 2L = ${fmt(ph.path,1)} m dalam ${fmt(ph.tns,1)} ns. ${hit?'BERKAS MENGENAI DETEKTOR ✔':'MELESET — detektor di φ='+fmt(p.phi,0)+'°, butuh i ≈ '+fmt(p.phi+2*p.al,0)+'°.'}`;
-  if(p.al!==0)mis='💡 Ingat: sudut tetap diukur dari NORMAL yang ikut miring bersama cermin — bukan dari vertikal ruangan.';
+  const ph=physDatar(p);
+  txt=`θᵢ = ${fmt(ph.th,1)}° = θᵣ ✓ Hukum Pemantulan terverifikasi (sudut diukur dari normal). Foton menempuh 2L = ${fmt(ph.path,1)} m dalam ${fmt(ph.tns,1)} ns. Satu baris data masuk Tabel Data (panel 🕓).`;
+  if(ph.folded)mis='💡 i > 180° berarti laser berada di sisi belakang cermin — otomatis dilipat ke sisi depan agar tetap memantul.';
  }
  else if(e==='BAUR'){const sp=p.rough/100*60;
   txt=p.rough<5?
@@ -38,54 +40,80 @@ export function analyzeExp(){
  else if(e==='KALEIDO'){const n=kaleidoN(p.theta);
   txt=`θ = ${p.theta}° → 360/θ = ${fmt(360/p.theta,1)} → jumlah bayangan n = ${n}. Bayangan-bayangan terletak merata pada lingkaran berpusat di poros — inilah prinsip kaleidoskop.`;
   if(360/p.theta<=2.5)mis='💡 θ sangat kecil → n sangat besar. Cermin sejajar (θ→0) memberi bayangan tak terhingga: coba bayangkan koridor tak berujung!';}
- else{const convex=e==='CEMBUNG'||(e==='APLIKASI'&&S.preset==='spion');
+ else{const convex=e==='CEMBUNG';
   const c=curvedCalc(p,convex);
-  const nm=e==='APLIKASI'?({spion:'Spion (cembung)',reflektor:'Reflektor (cekung)',teleskop:'Teleskop (cekung)'})[S.preset]:EXPS[e].short;
+  const preset=S.presetMap[e];
+  const nm=preset&&PRESET_NAMES[preset]?PRESET_NAMES[preset]:EXPS[e].short;
   if(c.inf){txt=`${nm}: s = f = ${fmt(p.R/2,2)} m → s′ = ∞. Sinar-sinar pantul SEJAJAR — bayangan terbentuk di tak hingga.`;
    mis='💡 Perhatikan: sinar-sinar pantul sekarang PARALEL satu sama lain. Rumus memberi 1/s′ = 0 — inilah prinsip reflektor senter!';}
   else{const nm2=(c.real?'NYATA':'MAYA')+', '+(c.tegak?'TEGAK':'TERBALIK')+', '+c.size+' ('+fmt(Math.abs(c.M),2)+'×)';
    txt=`${nm}: s=${fmt(p.s,1)} m, f=${fmt(c.fAbs,2)} m → s′ = ${fmt(c.sPrime,2)} m (${c.real?'di depan':'di belakang'} cermin). M = −s′/s = ${fmt(c.M,3)}. Bayangan: ${nm2}. h′ = ${fmt(c.hp,2)} m.`;
    if(e==='CEMBUNG')mis='💡 Bukti umum: berapa pun s, cermin cembung TIDAK PERNAH menghasilkan bayangan nyata — perpanjangan sinar (putus-putus) selalu bertemu di belakang cermin.';
    if(e==='CEKUNG'&&p.s<p.R/2)mis='💡 s < f: sinar pantul DIVERGEN → perpotongan hanya ada pada perpanjangan (putus-putus) di belakang cermin → bayangan maya tegak diperbesar (kaca rias!).';
-   if(e==='KUANTA'&&S.o.noise)mis='💡 Mode noise aktif: titik yang kamu rekam mengandung ketidakpastian ±2% — seperti alat nyata. Hitung persen error terhadap teori!';}}
+   if(S.o.noise)mis='💡 Mode noise aktif: titik yang kamu rekam mengandung ketidakpastian ±2% — seperti alat nyata. Hitung persen error terhadap teori!';}}
  return{txt,mis,hit}}
 
 export function finishRun(){
  S.running=false;S.finished=true;$('btnPlay').textContent='↻';
  const r=analyzeExp();
- let hit=r.hit;
- if(S.exp==='DATAR'){spawnBurst(hit);hit?sfx.hit():sfx.finish();
-  const th=Math.abs(P().i-P().al);
+ let row=null;
+ const p=P(),R=S.rows[S.exp];if(R.length>60)R.shift();
+ if(S.exp==='DATAR'){
+  const ph=physDatar(p);
+  sfx.finish();
   if(S.pts.DATAR.length>80)S.pts.DATAR.shift();
-  S.pts.DATAR.push({x:th,y:th})}
- else{sfx.finish();
-  const p=P();
-  if(S.exp==='BAUR'){if(S.pts.BAUR.length>80)S.pts.BAUR.shift();S.pts.BAUR.push({x:p.rough,y:p.rough/100*60})}
-  if(S.exp==='KALEIDO'){if(S.pts.KALEIDO.length>80)S.pts.KALEIDO.shift();S.pts.KALEIDO.push({x:p.theta,y:kaleidoN(p.theta)})}
-  if(['CEKUNG','CEMBUNG','KUANTA','APLIKASI'].includes(S.exp)){
-   const convex=S.exp==='CEMBUNG'||(S.exp==='APLIKASI'&&S.preset==='spion');
+  S.pts.DATAR.push({x:ph.th,y:ph.th});
+  row={n:R.length+1,i:ph.th,r:ph.th,be:ph.be,t:ph.tns};
+ }
+ else{
+  sfx.finish();
+  if(S.exp==='BAUR'){
+   if(S.pts.BAUR.length>80)S.pts.BAUR.shift();
+   S.pts.BAUR.push({x:p.rough,y:p.rough/100*60});
+   row={n:R.length+1,rough:p.rough,sp:p.rough/100*60};
+  }
+  else if(S.exp==='KALEIDO'){
+   if(S.pts.KALEIDO.length>80)S.pts.KALEIDO.shift();
+   S.pts.KALEIDO.push({x:p.theta,y:kaleidoN(p.theta)});
+   row={n:R.length+1,th:p.theta,nB:kaleidoN(p.theta)};
+  }
+  else{
+   const convex=S.exp==='CEMBUNG';
    const c=curvedCalc(p,convex);
    if(!c.inf&&!S.o.noise){
     if(S.pts[S.exp].length>80)S.pts[S.exp].shift();
     S.pts[S.exp].push({x:1/p.s,y:1/c.sPrime});
     if(S.ptsM[S.exp].length>80)S.ptsM[S.exp].shift();
-    S.ptsM[S.exp].push({x:p.s,y:c.M})}
+    S.ptsM[S.exp].push({x:p.s,y:c.M});
+    row={n:R.length+1,s:p.s,sp:c.sPrime,M:c.M,
+     sifat:(c.real?'nyata':'maya')+', '+(c.tegak?'tegak':'terbalik')+', '+c.size};
+   }
    if(!c.inf&&S.o.noise){
     const spm=noisy(c.sPrime);
     if(S.pts[S.exp].length>80)S.pts[S.exp].shift();
     S.pts[S.exp].push({x:1/p.s,y:1/spm});
     const err=Math.abs((spm-c.sPrime)/c.sPrime*100);
-    r.txt+=` [noise] s′ terukur = ${fmt(spm,2)} m → error ${fmt(err,1)}% terhadap teori.`}
-   if(c.inf)toast('s = f → bayangan di tak hingga; titik data tak terdefinisi')}}
+    r.txt+=` [noise] s′ terukur = ${fmt(spm,2)} m → error ${fmt(err,1)}% terhadap teori.`;
+    row={n:R.length+1,s:p.s,sp:spm,M:c.M,
+     sifat:(c.real?'nyata':'maya')+', '+(c.tegak?'tegak':'terbalik')+', terukur'};
+   }
+   if(c.inf)toast('s = f → bayangan di tak hingga; titik data tak terdefinisi');
+  }
+ }
+ if(row){R.push(row);store.set('rows_v2',S.rows)}
  store.set('pts',S.pts);store.set('ptsM',S.ptsM);
- $('console').classList.add('show');
+ setTimeout(positionConsole,140);
  const pEl=$('conTxt');pEl.textContent='';let j=0;
  const iv=setInterval(()=>{pEl.textContent=r.txt.slice(0,++j)+' ▌';
   if(j>=r.txt.length){clearInterval(iv);pEl.textContent=r.txt}},12);
  const misEl=$('conMis');
  if(r.mis){misEl.style.display='block';misEl.textContent=r.mis}else misEl.style.display='none';
- addHist(r.txt,hit);drawCharts()}
-
+ addHist();drawCharts();renderDataTable();renderHist();
+ clearTimeout(window._conTO);
+ window._conTO=setTimeout(()=>$('console').classList.remove('show'),12000)}
+export function closeConsole(){
+ clearTimeout(window._conTO);
+ $('console').classList.remove('show');sfx.click()}
 function physStep(){
  const u=clamp(S.data.length*FDT*S.speed/DUR,0,EXPS[S.exp].photon?2:1);
  S.data.push({u});
@@ -97,10 +125,10 @@ export function curFrame(){
 export function updateHUD(){
  const e=S.exp,p=P();let cells='';
  cells+=`<div class="tchip g"><small>EKSPERIMEN</small><b style="color:var(--acc)">${EXPS[e].short}</b></div>`;
- if(e==='DATAR'){const th=Math.abs(p.i-p.al),be=p.i-2*p.al,f=curFrame(),ph=physDatar(p);
+ if(e==='DATAR'){const f=curFrame(),ph=physDatar(p);
   const tShow=ph.tns*clamp(f.u||0,0,2)/2;
-  cells+=`<div class="tchip g"><small>θᵢ = θᵣ</small><b style="color:var(--ok)">${fmt(th,1)}°</b></div>
-   <div class="tchip g"><small>ARAH PANTUL β</small><b style="color:var(--acc2)">${fmt(be,1)}°</b></div>
+  cells+=`<div class="tchip g"><small>θᵢ = θᵣ</small><b style="color:var(--ok)">${fmt(ph.th,1)}°</b></div>
+   <div class="tchip g"><small>ARAH PANTUL β</small><b style="color:var(--acc2)">${fmt(ph.be,1)}°</b></div>
    <div class="tchip g"><small>WAKTU</small><b style="color:var(--warn)">${fmt(tShow,1)} ns</b></div>`}
  else if(e==='BAUR'){const sp=p.rough/100*60;
   cells+=`<div class="tchip g"><small>θᵢ</small><b style="color:var(--ok)">${fmt(p.i,0)}°</b></div>
@@ -111,7 +139,7 @@ export function updateHUD(){
   cells+=`<div class="tchip g"><small>SUDUT θ</small><b style="color:var(--ok)">${p.theta}°</b></div>
    <div class="tchip g"><small>360/θ</small><b style="color:var(--acc2)">${fmt(360/p.theta,1)}</b></div>
    <div class="tchip g"><small>BAYANGAN n</small><b style="color:var(--warn)">${n}</b></div>`}
- else{const convex=e==='CEMBUNG'||(e==='APLIKASI'&&S.preset==='spion');
+ else{const convex=e==='CEMBUNG';
   const c=curvedCalc(p,convex);
   cells+=`<div class="tchip g"><small>f = R/2</small><b style="color:var(--ok)">${convex?'−':''}${fmt(p.R/2,2)} m</b></div>
    <div class="tchip g"><small>s BENDA</small><b style="color:var(--acc2)">${fmt(p.s,1)} m</b></div>`;
@@ -124,13 +152,11 @@ export function updateHUD(){
  $('tCur').textContent=EXPS[e].photon?fmt((f.u||0)/2*physDatar(p).tns,1):fmt((f.u||0)/maxU*100,0);
  $('tUnit').textContent=EXPS[e].photon?' ns':'%';
  $('ring').style.strokeDashoffset=176*(1-clamp((f.u||0)/maxU,0,1))}
-
 export function stepFrame(){if(S.running&&!S.paused)pauseRun();
  if(!S.data.length){startRun();return}
  if(S.frame<S.data.length-1){S.frame++;$('scrub').value=S.frame;updateHUD()}sfx.click()}
  $('scrub').oninput=e=>{S.frame=+e.target.value;updateHUD()};
  $('selSpd').onchange=e=>{S.speed=+e.target.value;toast('Playback '+S.speed+'×')};
-
 let lastT=performance.now(),acc=0;
 export function loop(now){
  const dt=Math.min((now-lastT)/1000,.1);lastT=now;

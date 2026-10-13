@@ -9,7 +9,7 @@ import {curFrame} from './engine.js';
 export const vp=$('bench');let vc=null;
 export function fitScene(){const d=devicePixelRatio||1;
  vp.width=innerWidth*d;vp.height=innerHeight*d;
- vc=vp.getContext('2d');vc.setTransform(d,0,0,d,0,0)}
+  vc=vp.getContext('2d',{willReadFrequently:true});vc.setTransform(d,0,0,d,0,0)}
 addEventListener('resize',fitScene);
 const STARS=Array.from({length:110},()=>({x:Math.random(),y:Math.random()*.75,r:Math.random()*1.3+.3,ph:Math.random()*7}));
 export const trailPts=[],burst=[];
@@ -81,43 +81,43 @@ export function drawScene(now){
   vc.fillStyle=(b.hit?'#41E8A5':c1)+Math.round(b.l*200).toString(16).padStart(2,'0');
   vc.beginPath();vc.arc(b.x,b.y,2.6,0,7);vc.fill()}}
 
-/* ---- E1: cermin datar ---- */
+/* ---- E1: cermin datar — laser menyapu busur atas kiri↔kanan (0=normal) ---- */
+let datarFinT=0;
 function drawDatar(W,H,t,c1,c2,p,f){
- const Lpx=Math.min(30*p.L,W*.5-215),OX=W/2,OY=H*.54,a=p.al*DEG;
- const nX=-Math.sin(a),nY=-Math.cos(a);
- const dInX=Math.sin(p.i*DEG),dInY=Math.cos(p.i*DEG);
- const rCvX=Math.sin((p.i-2*p.al)*DEG),rCvY=-Math.cos((p.i-2*p.al)*DEG);
- const lasX=OX-dInX*Lpx,lasY=OY-dInY*Lpx;
- const detX=OX+Math.sin(p.phi*DEG)*Lpx,detY=OY-Math.cos(p.phi*DEG)*Lpx;
+ const u=f.u||0;
+ const done=u>=2;
+ if(!done)datarFinT=0;
+ const a=p.al*DEG;
+ const i=clamp(p.i,-90,90)*DEG;
+ /* cincin membesar mengikuti L */
+ const maxR=Math.max(150,Math.min(W*.5-130,H*.46-60,H*.54-95));
+ const Lpx=120+(maxR-120)*Math.sqrt((p.L-1)/39);
+ const OX=Math.round(W*.5),OY=Math.round(H*.46);
+ /* kerangka lokal cermin (rotate -a, seperti v1):
+    y+ lokal = sisi DEPAN (reflektif, ke atas saat α=0)
+    i diukur dari NORMAL: i=0 → laser sepanjang normal;
+    i>0 → miring ke kanan; i<0 → ke kiri (busur atas saja) */
+ const toW=(lx,ly)=>({x:OX+lx*Math.cos(a)-ly*Math.sin(a),
+                      y:OY-lx*Math.sin(a)-ly*Math.cos(a)});
+ const O={x:OX,y:OY};
+ const off=i;
+ const Lp=toW(Math.sin(off)*Lpx, Math.cos(off)*Lpx);
+ const Rp=toW(-Math.sin(off)*Lpx, Math.cos(off)*Lpx);
+ const Np=toW(0,Lpx);
+ const halfLen=110;
+ const E1=toW(-halfLen,0),E2=toW(halfLen,0);
+ const p1=clamp(u,0,1),p2=clamp(u-1,0,1);
+ const reveal=done?clamp((t-datarFinT)/.7,0,1):0;
+ if(done&&!datarFinT)datarFinT=t;
+ /* cincin lintasan */
  vc.setLineDash([3,9]);vc.strokeStyle=c1+'2A';vc.lineWidth=1;
  vc.beginPath();vc.arc(OX,OY,Lpx,0,7);vc.stroke();vc.setLineDash([]);
+ /* normal */
  if(S.o.norm){vc.setLineDash([4,7]);vc.strokeStyle='rgba(237,242,252,.4)';vc.lineWidth=1.4;
-  vc.beginPath();vc.moveTo(OX-nX*84,OY-nY*84);vc.lineTo(OX+nX*84,OY+nY*84);vc.stroke();vc.setLineDash([]);
+  vc.beginPath();vc.moveTo(O.x,O.y);vc.lineTo(Np.x,Np.y);vc.stroke();vc.setLineDash([]);
   vc.fillStyle='rgba(237,242,252,.55)';vc.font='9px JetBrains Mono';vc.textAlign='center';
-  vc.fillText('NORMAL',OX+nX*102,OY+nY*102+3)}
- if(S.o.arcs){
-  const aN=Math.atan2(nY,nX),aI=Math.atan2(-dInY,-dInX),aR=Math.atan2(rCvY,rCvX);
-  const arcB=(a1,a2,r)=>{let dd=a2-a1;while(dd>Math.PI)dd-=2*Math.PI;while(dd<-Math.PI)dd+=2*Math.PI;
-   vc.beginPath();for(let k=0;k<=24;k++){const aa=a1+dd*k/24;
-    const x=OX+Math.cos(aa)*r,y=OY+Math.sin(aa)*r;k?vc.lineTo(x,y):vc.moveTo(x,y)}vc.stroke()};
-  vc.lineWidth=2;
-  vc.strokeStyle='rgba(65,232,165,.85)';arcB(aN,aI,46);
-  vc.strokeStyle=c1;arcB(aN,aR,58);
-  vc.font='10px JetBrains Mono';vc.textAlign='center';
-  const mid1=aN+(((aI-aN)%(2*Math.PI)+3*Math.PI)%(2*Math.PI)-Math.PI)/2;
-  const mid2=aN+(((aR-aN)%(2*Math.PI)+3*Math.PI)%(2*Math.PI)-Math.PI)/2;
-  vc.fillStyle='rgba(65,232,165,.95)';vc.fillText('i='+fmt(physDatar(p).th,0)+'°',OX+Math.cos(mid1)*66,OY+Math.sin(mid1)*66+3);
-  vc.fillStyle=c1;vc.fillText('r='+fmt(physDatar(p).th,0)+'°',OX+Math.cos(mid2)*78,OY+Math.sin(mid2)*78+3)}
- vc.shadowColor=c1;vc.shadowBlur=12;
- let g1=vc.createLinearGradient(lasX,lasY,OX,OY);
- g1.addColorStop(0,c1+'33');g1.addColorStop(1,c1+'EE');
- vc.strokeStyle=g1;vc.lineWidth=3;
- vc.beginPath();vc.moveTo(lasX,lasY);vc.lineTo(OX,OY);vc.stroke();
- const endX=OX+rCvX*Lpx,endY=OY+rCvY*Lpx;
- let g2=vc.createLinearGradient(OX,OY,endX,endY);
- g2.addColorStop(0,c1+'EE');g2.addColorStop(1,c1+'33');
- vc.strokeStyle=g2;vc.lineWidth=3;
- vc.beginPath();vc.moveTo(OX,OY);vc.lineTo(endX,endY);vc.stroke();vc.shadowBlur=0;
+  vc.fillText('NORMAL',(O.x+Np.x)/2,(O.y+Np.y)/2-8)}
+ /* ===== CERMIN bentuk asli (translate+rotate) ===== */
  vc.save();vc.translate(OX,OY);vc.rotate(-a);
  vc.shadowColor='rgba(200,220,255,.7)';vc.shadowBlur=14;
  const mg=vc.createLinearGradient(-110,0,110,0);
@@ -127,33 +127,71 @@ function drawDatar(W,H,t,c1,c2,p,f){
  vc.shadowBlur=0;vc.strokeStyle='rgba(255,255,255,.25)';vc.lineWidth=8;
  vc.beginPath();vc.moveTo(-104,5);vc.lineTo(104,5);vc.stroke();
  vc.restore();vc.lineCap='butt';
- vc.save();vc.translate(lasX,lasY);vc.rotate(Math.atan2(dInY,dInX));
+ /* ===== emitter laser ===== */
+ vc.save();vc.translate(Lp.x,Lp.y);vc.rotate(Math.atan2(O.y-Lp.y,O.x-Lp.x));
  vc.fillStyle=c2;vc.shadowColor=c2;vc.shadowBlur=12;
  vc.beginPath();vc.roundRect(-8,-9,34,18,7);vc.fill();
  vc.fillStyle='#0B1120';vc.beginPath();vc.roundRect(-2,-4,10,8,3);vc.fill();
  vc.restore();vc.shadowBlur=0;
  vc.fillStyle='rgba(237,242,252,.6)';vc.font='9px JetBrains Mono';vc.textAlign='center';
- vc.fillText('LASER',lasX,lasY+28);
- const hit=physDatar(p).hitTarget;
- vc.save();vc.translate(detX,detY);vc.rotate(Math.atan2(OY-detY,OX-detX));
- vc.shadowColor=hit?'#41E8A5':c1;vc.shadowBlur=hit?26:10;
- vc.fillStyle=hit?'#41E8A5':c2;
- vc.beginPath();vc.arc(0,0,13,Math.PI*.6,Math.PI*1.4);vc.lineTo(0,0);vc.closePath();vc.fill();
- vc.shadowBlur=0;vc.fillStyle='rgba(11,17,32,.9)';vc.fillRect(-4,-3,9,6);
- vc.restore();
- vc.fillStyle=hit?'#41E8A5':'rgba(237,242,252,.6)';vc.font='9px JetBrains Mono';vc.textAlign='center';
- vc.fillText(hit?'DETEKTOR ✔':'DETEKTOR',detX,detY+30);
- if(S.o.amb){ambPh.forEach((q,k)=>{
-  q.p=(q.p+.004+.002*(k%3))%1;
-  const uu=q.p*2;let ax,ay;
-  if(uu<1){ax=lerp(lasX,OX,uu);ay=lerp(lasY,OY,uu)}
-  else{ax=lerp(OX,endX,uu-1);ay=lerp(OY,endY,uu-1)}
-  vc.fillStyle=c1+'66';vc.beginPath();vc.arc(ax,ay,1.8,0,7);vc.fill()})}
- photonAlong([{x:lasX,y:lasY},{x:OX,y:OY},{x:endX,y:endY}],(f.u||0)/2,c1);
+ vc.fillText('LASER',Lp.x,Lp.y+28);
+ /* ===== SEBELUM ▶: jalur DATANG saja (dashed) ===== */
+ if(p1+p2<=0){
+  vc.setLineDash([5,7]);vc.strokeStyle=c1+'88';vc.lineWidth=1.6;
+  vc.beginPath();vc.moveTo(Lp.x,Lp.y);vc.lineTo(O.x,O.y);vc.stroke();
+  vc.setLineDash([])}
+ /* ===== SAAT ▶: garis terbentuk mengikuti foton ===== */
+ if(p1>0){
+  const px=lerp(Lp.x,O.x,p1),py=lerp(Lp.y,O.y,p1);
+  vc.shadowColor=c1;vc.shadowBlur=12;
+  let g1=vc.createLinearGradient(Lp.x,Lp.y,px,py);
+  g1.addColorStop(0,c1+'44');g1.addColorStop(1,c1);
+  vc.strokeStyle=g1;vc.lineWidth=3;
+  vc.beginPath();vc.moveTo(Lp.x,Lp.y);vc.lineTo(px,py);vc.stroke();vc.shadowBlur=0;
+  glowDot(px,py,c1)}
+ if(p2>0){
+  const px=lerp(O.x,Rp.x,p2),py=lerp(O.y,Rp.y,p2);
+  vc.shadowColor=c1;vc.shadowBlur=12;
+  let g2=vc.createLinearGradient(O.x,O.y,px,py);
+  g2.addColorStop(0,c1);g2.addColorStop(1,c1+'66');
+  vc.strokeStyle=g2;vc.lineWidth=3;
+  vc.beginPath();vc.moveTo(O.x,O.y);vc.lineTo(px,py);vc.stroke();vc.shadowBlur=0;
+  glowDot(px,py,c1)}
+ /* kilau titik datang */
  vc.save();vc.shadowColor='#fff';vc.shadowBlur=10;
- vc.fillStyle='rgba(255,255,255,'+(.5+.4*Math.sin(t*6))+')';
- vc.beginPath();vc.arc(OX,OY,3.4,0,7);vc.fill();vc.restore();
- if(Lpx>0)drawScaleBar(186,H-30,Lpx/p.L,c1)}
+ vc.fillStyle='rgba(255,255,255,'+(.45+.35*Math.sin(t*6))+')';
+ vc.beginPath();vc.arc(O.x,O.y,3.2,0,7);vc.fill();vc.restore();
+ /* ===== BUSUR i & r + LABEL — setelah foton selesai ===== */
+ if(reveal>0){
+  vc.globalAlpha=reveal;
+  const aN=Math.atan2(Np.y-O.y,Np.x-O.x);
+  const aL=Math.atan2(Lp.y-O.y,Lp.x-O.x);
+  const aR=Math.atan2(Rp.y-O.y,Rp.x-O.x);
+  const arcB=(a1,a2,r)=>{let dd=a2-a1;while(dd>Math.PI)dd-=2*Math.PI;while(dd<-Math.PI)dd+=2*Math.PI;
+   vc.beginPath();for(let k=0;k<=24;k++){const aa=a1+dd*k/24;
+    const x=O.x+Math.cos(aa)*r,y=O.y+Math.sin(aa)*r;k?vc.lineTo(x,y):vc.moveTo(x,y)}vc.stroke()};
+  vc.lineWidth=2;
+  vc.strokeStyle='rgba(65,232,165,.9)';arcB(aN,aL,46);
+  vc.strokeStyle=c1;arcB(aN,aR,58);
+  const mid1=aN+(((aL-aN)%(2*Math.PI)+3*Math.PI)%(2*Math.PI)-Math.PI)/2;
+  const mid2=aN+(((aR-aN)%(2*Math.PI)+3*Math.PI)%(2*Math.PI)-Math.PI)/2;
+  vc.font='10px JetBrains Mono';vc.textAlign='center';
+  vc.fillStyle='rgba(65,232,165,.95)';
+  vc.fillText('i='+fmt(Math.abs(p.i),0)+'°',O.x+Math.cos(mid1)*64,O.y+Math.sin(mid1)*64+3);
+  vc.fillStyle=c1;
+  vc.fillText('r='+fmt(Math.abs(p.i),0)+'°',O.x+Math.cos(mid2)*76,O.y+Math.sin(mid2)*76+3);
+  vc.fillStyle='rgba(237,242,252,.7)';
+  vc.fillText('sinar datang',(Lp.x+O.x)/2-38,(Lp.y+O.y)/2);
+  vc.fillText('sinar pantul',(O.x+Rp.x)/2+38,(O.y+Rp.y)/2-8);
+  vc.globalAlpha=1;
+ }
+}
+/* kepala foton menyala */
+function glowDot(x,y,c1){
+ vc.save();vc.shadowColor='#fff';vc.shadowBlur=16;
+ const g=vc.createRadialGradient(x-2,y-2,0,x,y,8);
+ g.addColorStop(0,'#fff');g.addColorStop(1,c1);
+ vc.fillStyle=g;vc.beginPath();vc.arc(x,y,6.5,0,7);vc.fill();vc.restore()}
 
 /* ---- E2: baur vs teratur ---- */
 function drawBaur(W,H,t,c1,c2,p){
@@ -252,29 +290,107 @@ function drawKaleido(W,H,t,c1,c2,p){
   vc.save();vc.shadowColor='#fff';vc.shadowBlur=14;
   vc.fillStyle='#fff';vc.beginPath();vc.arc(lastPx,lastPy,6,0,7);vc.fill();vc.restore()}}
 
-/* ---- E4–E7: cermin lengkung ---- */
+/* ---- E4: cermin cekung — sudut datang diatur, refleksi vektor di busur ---- */
+let curFinT=0;
 function drawCurved(W,H,t,c1,c2,p,f){
- const convex=S.exp==='CEMBUNG'||(S.exp==='APLIKASI'&&S.preset==='spion');
+ const u=f.u||0;
+ const done=u>=2;
+ if(!done)curFinT=0;
+ const convex=S.exp==='CEMBUNG';
  const cc=curvedCalc(p,convex);
- const cy=H*.5,Vx=Math.round(W*.62);
- const spDisp=cc.inf?cc.fAbs:Math.min(Math.abs(cc.sPrime),40);
+ const cy=Math.round(H*.5);
+ const xL=170,xR=W-140;
+ const cxS=Math.round((xL+xR)/2);
+ const spDisp=cc.inf?0:(cc.sPrime>0?Math.min(cc.sPrime,40):-Math.min(Math.abs(cc.sPrime),40));
  const hDisp=cc.inf?0:clamp(cc.hp,-9,9);
  const clipped=!cc.inf&&(Math.abs(cc.sPrime)>40||Math.abs(cc.hp)>9.01);
- let scale=Math.min(
-  (Vx-185)/Math.max(p.s,2.5),
-  (W-Vx-100)/Math.max(spDisp,2.5),
-  (cy-66)/Math.max(Math.abs(hDisp),p.h,1.6),
-  46);
- scale=Math.max(scale,4);
- const bx=Vx-p.s*scale,by=cy-p.h*scale;
- const fsg=convex?1:-1;
- const Fx=Vx+fsg*cc.fAbs*scale,Cx=Vx+fsg*2*cc.fAbs*scale;
- const Rpx=p.R*scale;
- vc.setLineDash([2,8]);vc.strokeStyle='rgba(237,242,252,.3)';vc.lineWidth=1;
- vc.beginPath();vc.moveTo(60,cy);vc.lineTo(W-60,cy);vc.stroke();vc.setLineDash([]);
- const halfH=Math.min(92,Rpx*.55),thm=halfH/Rpx;
+ /* iterasi skala: muat benda, R, bayangan, dan h=10 di bawah puncak cermin */
+ let scale=46,Vx=0,bx=0,Rpt=0,Fpt=0,xb=0,halfH=110,Rpx=0;
+ for(let it=0;it<90;it++){
+  Rpx=p.R*scale;
+  Vx=Math.round(cxS+p.s*scale/2);
+  bx=Vx-p.s*scale;
+  Rpt=convex?Vx+p.R*scale:Vx-p.R*scale;
+  Fpt=convex?Vx+(p.R/2)*scale:Vx-(p.R/2)*scale;
+  halfH=Math.min(Math.max(110,Rpx*.8),300,cy-75,H-125-cy,Rpx*.98);
+  xb=cc.inf?Vx:Vx-(cc.sPrime>0?1:-1)*Math.min(Math.abs(cc.sPrime),40)*scale;
+  const hOk=(10*scale)<=halfH*.92;
+  if(hOk&&bx>=xL&&Rpt>=xL-10&&Rpt<=xR-10&&xb>=xL&&xb<=xR-10&&Vx<=xR-90)break;
+  scale*=.94;
+ }
+ scale=Math.max(scale,6);
+ Rpx=Math.max(90,p.R*scale);
+ Vx=Math.round(cxS+p.s*scale/2);
+ bx=Vx-p.s*scale;
+ Rpt=convex?Vx+p.R*scale:Vx-p.R*scale;
+ Fpt=convex?Vx+(p.R/2)*scale:Vx-(p.R/2)*scale;
+ halfH=Math.min(Math.max(110,Rpx*.8),300,cy-75,H-125-cy,Rpx*.98);
+ xb=cc.inf?Vx:Vx-(cc.sPrime>0?1:-1)*Math.min(Math.abs(cc.sPrime),40)*scale;
+ /* ===== titik kunci ===== */
+ const bw=Math.max(9,scale*.38);
+ const A={x:Math.max(bx,xL+8),y:cy-p.h*scale};       /* puncak lilin (h meter asli) */
+ const sp=cc.inf?999:cc.sPrime;
+ const yb=cc.inf?cy:cy-hDisp*scale;
+ /* ===== sudut datang dari slider (0° = sejajar sumbu, positif menunduk) ===== */
+ const ang=clamp(+(p.ang||0),0,85)*DEG;
+ /* clamp agar sinar selalu mengenai busur (ujung bawah) */
+ const maxDn=Math.atan2((cy+halfH)-A.y,Vx-A.x);
+ const angR=Math.min(Math.max(ang,0.02),Math.max(maxDn*.98,0.02));
+ const dir0={x:Math.cos(angR),y:Math.sin(angR)};
+ /* ===== perpotongan sinar dengan lingkaran cermin ===== */
+ const Cc={x:convex?Vx+Rpx:Vx-Rpx,y:cy};
+ const ox2=A.x-Cc.x,oy2=A.y-Cc.y;
+ const bq=2*(ox2*dir0.x+oy2*dir0.y),cq=ox2*ox2+oy2*oy2-Rpx*Rpx;
+ const disc=bq*bq-4*cq;
+ let tt=Math.max(1,cy-A.y);
+ if(disc>=0){const s2=Math.sqrt(disc);const t1=(-bq-s2)/2,t2=(-bq+s2)/2;
+  if(convex){if(t1>0)tt=t1;else if(t2>0)tt=t2}
+  else{if(t2>0)tt=t2;else if(t1>0)tt=t1}}
+ const P1={x:A.x+dir0.x*tt,y:A.y+dir0.y*tt};
+ /* ===== normal lokal busur & refleksi vektor ===== */
+ let nX=Cc.x-P1.x,nY=Cc.y-P1.y;const nL=Math.hypot(nX,nY)||1;nX/=nL;nY/=nL;
+ const dn=dir0.x*nX+dir0.y*nY;
+ const rX=dir0.x-2*dn*nX,rY=dir0.y-2*dn*nY;
+ const rl=Math.hypot(rX,rY)||1;const rUx=rX/rl,rUy=rY/rl;
+ /* ===== fase animasi ===== */
+ const p1=clamp(u/.55,0,1),p2=clamp((u-.55)/.45,0,1);
+ const reveal=done?clamp((t-curFinT)/.7,0,1):0;
+ if(done&&!curFinT)curFinT=t;
+ /* ===== SUMBU UTAMA ===== */
+ const xs=[bx,Rpt,Fpt,Vx,xb].filter(x=>isFinite(x));
+ const axL=Math.max(70,Math.min(...xs)-55);
+ const axR=Math.min(W-85,Math.max(...xs)+55+90);
+ vc.strokeStyle='rgba(237,242,252,.6)';vc.lineWidth=2;
+ vc.beginPath();vc.moveTo(axL,cy);vc.lineTo(axR,cy);vc.stroke();
+ /* ===== ZONA I II III IV ===== */
+ const zc=x=>clamp(x,axL+28,axR-28);
+ vc.fillStyle=c1;vc.font='600 13px Outfit';vc.textAlign='center';vc.textBaseline='middle';
+ if(!convex){
+  vc.fillText('III',zc((axL+Rpt)/2),cy);
+  vc.fillText('II',zc((Rpt+Fpt)/2),cy);
+  vc.fillText('I',zc((Fpt+Vx)/2),cy);
+  const z4=clamp(Vx+70,Vx+40,axR-30);
+  vc.fillText('IV',z4,cy);
+ }else{
+  vc.fillText('I',zc((axL+Vx)/2),cy);
+  const z4=clamp(Vx+70,Vx+40,axR-30);
+  vc.fillText('IV',z4,cy);
+ }
+ vc.textBaseline='alphabetic';
+ /* ===== TITIK F & R ===== */
+ if(S.o.fclabel){
+  const tick=(x,lbl)=>{
+   vc.strokeStyle='rgba(237,242,252,.6)';vc.lineWidth=1.5;
+   vc.beginPath();vc.moveTo(x,cy-6);vc.lineTo(x,cy+6);vc.stroke();
+   vc.fillStyle='#FFC46B';vc.font='10px JetBrains Mono';vc.textAlign='center';
+   vc.fillText(lbl,x,cy-12)};
+  tick(Fpt,'F');tick(Rpt,'R');
+ }
+ /* ===== busur cermin ===== */
+ const halfH2=Math.min(halfH,Rpx*.98);
+ const thm=Math.asin(Math.min(halfH2/Rpx,.95));
  vc.save();
- const Mg=vc.createLinearGradient(Vx,cy-halfH,Vx,cy+halfH);
+ const Mg=vc.createLinearGradient(Vx,cy-halfH2,Vx,cy+halfH2);
  Mg.addColorStop(0,'#8FA2BC');Mg.addColorStop(.5,'#E8F0FC');Mg.addColorStop(1,'#8FA2BC');
  vc.strokeStyle=Mg;vc.lineWidth=6;vc.lineCap='round';
  vc.shadowColor='rgba(200,220,255,.7)';vc.shadowBlur=14;
@@ -288,61 +404,143 @@ function drawCurved(W,H,t,c1,c2,p,f){
  else vc.arc(Vx-Rpx,cy,Rpx-4,-thm,thm);
  vc.stroke();
  vc.restore();vc.lineCap='butt';
- if(S.o.fclabel){
-  const dot=(x,y,lbl,maya)=>{
-   vc.fillStyle=maya?'#9D7BFF':'#FFC46B';
-   vc.beginPath();vc.arc(x,y,4,0,7);vc.fill();
+ /* ===== OBJEK: lilin (batang + api) ===== */
+ vc.save();
+ vc.fillStyle='rgba(237,242,252,.85)';
+ vc.beginPath();vc.roundRect(A.x-bw/2,A.y,bw,cy-A.y,3);vc.fill();
+ vc.fillStyle='rgba(255,255,255,.25)';
+ vc.fillRect(A.x+bw*.3,A.y+3,bw*.15,cy-A.y-6);
+ const fl=1+.12*Math.sin(t*9);
+ vc.shadowColor='#FFC46B';vc.shadowBlur=14;
+ const fg2=vc.createRadialGradient(A.x,A.y-6*fl,0,A.x,A.y-6*fl,10*fl);
+ fg2.addColorStop(0,'#FFF3C9');fg2.addColorStop(.5,'#FFC46B');fg2.addColorStop(1,'rgba(255,140,60,0)');
+ vc.fillStyle=fg2;vc.beginPath();vc.arc(A.x,A.y-6*fl,10*fl,0,7);vc.fill();
+ vc.restore();
+ vc.fillStyle='rgba(237,242,252,.75)';vc.font='10px JetBrains Mono';vc.textAlign='center';
+ vc.fillText('benda',A.x,cy+18);
+ /* ===== SEBELUM ▶: jalur DATANG saja (dashed) ===== */
+ if(p1+p2<=0){
+  vc.setLineDash([5,7]);vc.strokeStyle=c1+'88';vc.lineWidth=1.6;
+  vc.beginPath();vc.moveTo(A.x,A.y);vc.lineTo(P1.x,P1.y);vc.stroke();
+  vc.setLineDash([])}
+ /* ===== SAAT ▶: foton + garis datang terbentuk ===== */
+ if(p1>0){
+  const qx=lerp(A.x,P1.x,p1),qy=lerp(A.y,P1.y,p1);
+  vc.shadowColor=c1;vc.shadowBlur=12;
+  let g1=vc.createLinearGradient(A.x,A.y,qx,qy);
+  g1.addColorStop(0,c1+'44');g1.addColorStop(1,c1);
+  vc.strokeStyle=g1;vc.lineWidth=3;
+  vc.beginPath();vc.moveTo(A.x,A.y);vc.lineTo(qx,qy);vc.stroke();vc.shadowBlur=0;
+  glowDot(qx,qy,c1)}
+ /* ===== SAAT ▶: garis pantulan terbentuk ===== */
+ if(p2>0){
+  const qd=Math.min(p2*1.6,1)*(cc.inf?280:Math.hypot(xb-P1.x,yb-P1.y));
+  const qx=P1.x+rUx*qd,qy=P1.y+rUy*qd;
+  vc.shadowColor=c1;vc.shadowBlur=12;
+  let g2=vc.createLinearGradient(P1.x,P1.y,qx,qy);
+  g2.addColorStop(0,c1);g2.addColorStop(1,c1+'66');
+  vc.strokeStyle=g2;vc.lineWidth=3;
+  vc.beginPath();vc.moveTo(P1.x,P1.y);vc.lineTo(qx,qy);vc.stroke();vc.shadowBlur=0;
+  glowDot(qx,qy,c1)}
+ /* kilau titik pantul */
+ vc.save();vc.shadowColor='#fff';vc.shadowBlur=10;
+ vc.fillStyle='rgba(255,255,255,'+(.45+.35*Math.sin(t*6))+')';
+ vc.beginPath();vc.arc(P1.x,P1.y,3.2,0,7);vc.fill();vc.restore();
+ /* ===== GARIS RESMI + BAYANGAN — setelah foton selesai ===== */
+ if(reveal>0){
+  vc.globalAlpha=reveal;
+  let g1=vc.createLinearGradient(A.x,A.y,P1.x,P1.y);
+  g1.addColorStop(0,c1+'55');g1.addColorStop(1,c1);
+  vc.strokeStyle=g1;vc.lineWidth=2.6;
+  vc.beginPath();vc.moveTo(A.x,A.y);vc.lineTo(P1.x,P1.y);vc.stroke();
+  let g2=vc.createLinearGradient(P1.x,P1.y,xb,yb);
+  g2.addColorStop(0,c1);g2.addColorStop(1,sp>0?'#41E8A5':'#9D7BFF');
+  vc.strokeStyle=g2;vc.lineWidth=2.6;
+  vc.beginPath();vc.moveTo(P1.x,P1.y);vc.lineTo(xb,yb);vc.stroke();
+  if(S.o.arcs){
+   const aN=Math.atan2(nY,nX);
+   const aI=Math.atan2(A.y-P1.y,A.x-P1.x),aR=Math.atan2(yb-P1.y,xb-P1.x);
+   const arcB=(a1,a2,r)=>{let dd=a2-a1;while(dd>Math.PI)dd-=2*Math.PI;while(dd<-Math.PI)dd+=2*Math.PI;
+    vc.beginPath();for(let k=0;k<=24;k++){const aa=a1+dd*k/24;
+     const x=P1.x+Math.cos(aa)*r,y=P1.y+Math.sin(aa)*r;k?vc.lineTo(x,y):vc.moveTo(x,y)}vc.stroke()};
+   vc.lineWidth=2;
+   vc.strokeStyle='rgba(65,232,165,.9)';arcB(aN,aI,46);
+   vc.strokeStyle=c1;arcB(aN,aR,58);
+   const mid1=aN+(((aI-aN)%(2*Math.PI)+3*Math.PI)%(2*Math.PI)-Math.PI)/2;
+   const mid2=aN+(((aR-aN)%(2*Math.PI)+3*Math.PI)%(2*Math.PI)-Math.PI)/2;
    vc.font='10px JetBrains Mono';vc.textAlign='center';
-   vc.fillText(lbl,x,y-10)};
-  dot(Fx,cy,'F',convex);dot(Cx,cy,'C (2F)',convex)}
- arrow(bx,cy,bx,by,'#EDF2FC',4);
- vc.fillStyle='#EDF2FC';vc.font='10px JetBrains Mono';vc.textAlign='center';
- vc.fillText('h='+fmt(p.h,1)+'m',bx,cy+18);
- if(cc.inf){
-  const m1=(cy-by)/(Fx-Vx);
-  vc.strokeStyle=c1;vc.lineWidth=2.6;
-  vc.beginPath();vc.moveTo(Vx,by);vc.lineTo(Vx-320,by-m1*320);vc.stroke();
-  vc.strokeStyle=c2;vc.lineWidth=2.2;
-  vc.beginPath();vc.moveTo(Vx,cy);vc.lineTo(Vx-320,cy+(p.h/p.s)*320);vc.stroke();
-  vc.fillStyle='rgba(237,242,252,.85)';vc.font='11px JetBrains Mono';vc.textAlign='left';
-  vc.fillText('s = f → semua sinar pantul SEJAJAR → s′ = ∞',Math.max(bx-40,150),by-16);
-  photonAlong([{x:bx,y:by},{x:Vx,y:by},{x:Vx-320,y:by-m1*330}],(f.u||0)/2,c1);
-  drawScaleBar(186,H-30,scale,c1);
-  return}
- const sp=cc.sPrime,M=cc.M,hp=cc.hp;
- const xb=Vx-spDisp*scale,yb=cy-hDisp*scale;
- arrow(bx,by,Vx,by,c1,2.4);
- let d1x,d1y;
- if(!convex){d1x=Fx-Vx;d1y=cy-by}
- else{d1x=Vx-Fx;d1y=by-cy}
- const L1=Math.hypot(d1x,d1y)||1;d1x/=L1;d1y/=L1;
- vc.strokeStyle=c1;vc.lineWidth=2.4;
- vc.beginPath();vc.moveTo(Vx,by);vc.lineTo(Vx+d1x*340,by+d1y*340);vc.stroke();
- if(sp<0){vc.setLineDash([5,6]);vc.strokeStyle=c1+'99';
-  vc.beginPath();vc.moveTo(Vx,by);vc.lineTo(xb,yb);vc.stroke();vc.setLineDash([])}
- const den2=(Fx-bx);
- const M2y=Math.abs(den2)>1e-6?by+(cy-by)*(Vx-bx)/den2:cy;
- arrow(bx,by,Vx,M2y,c1,2.4);
- vc.strokeStyle=c1;vc.lineWidth=2.4;
- vc.beginPath();vc.moveTo(Vx,M2y);vc.lineTo(Vx-330,M2y);vc.stroke();
- if(sp<0){vc.setLineDash([5,6]);vc.strokeStyle=c1+'99';
-  vc.beginPath();vc.moveTo(Vx,M2y);vc.lineTo(xb,yb);vc.stroke();vc.setLineDash([])}
- if(S.o.r3&&Math.abs(Cx-bx)>.35*scale){
-  const M3y=by+(cy-by)*(Vx-bx)/(Cx-bx);
-  arrow(bx,by,Vx,M3y,c2,2);
-  const dx3=bx-Vx,dy3=by-M3y,L3=Math.hypot(dx3,dy3)||1;
-  vc.strokeStyle=c2;vc.lineWidth=2;
-  vc.beginPath();vc.moveTo(Vx,M3y);vc.lineTo(Vx+dx3/L3*320,M3y+dy3/L3*320);vc.stroke();
-  if(sp<0){vc.setLineDash([5,6]);vc.strokeStyle=c2+'99';
-   vc.beginPath();vc.moveTo(Vx,M3y);vc.lineTo(xb,yb);vc.stroke();vc.setLineDash([])}}
- const bcol=sp>0?'#41E8A5':'#9D7BFF';
- arrow(xb,cy,xb,yb,bcol,4,sp<0?[6,6]:[]);
- const lx=Math.min(Math.max(xb,150),W-125);
- vc.fillStyle=bcol;vc.font='10px JetBrains Mono';vc.textAlign='center';
- const stat=(sp>0?'NYATA':'MAYA')+', '+(hp>0?'TEGAK':'TERBALIK')+', '+cc.size;
- vc.fillText('s′='+fmt(sp,2)+'m'+(Math.abs(sp)>40?' →':''),lx,cy+(hp>0?-14:28));
- vc.fillText(stat+(clipped?' *':''),lx,cy+(hp>0?-28:42));
- if(clipped){vc.fillStyle='rgba(255,196,107,.85)';vc.font='9px JetBrains Mono';
-  vc.fillText('* sebagian di luar bingkai (nilai aktual di HUD)',lx,cy+(hp>0?-42:56))}
- photonAlong([{x:bx,y:by},{x:Vx,y:by},{x:Vx+d1x*200,y:by+d1y*200}],(f.u||0)/2,c1);
+   vc.fillStyle='rgba(65,232,165,.95)';
+   vc.fillText('i',P1.x+Math.cos(mid1)*62,P1.y+Math.sin(mid1)*62+3);
+   vc.fillStyle=c1;
+   vc.fillText('r',P1.x+Math.cos(mid2)*74,P1.y+Math.sin(mid2)*74+3);
+  }
+  const bcol=sp>0?'#41E8A5':'#9D7BFF';
+  if(!cc.inf){
+   arrow(xb,cy,xb,yb,bcol,3,sp<0?[5,4]:[]);
+   vc.save();vc.globalAlpha=reveal*.9;
+   vc.fillStyle=bcol;
+   /* kotak lilin bayangan: dukung dua arah (di atas / di bawah sumbu) */
+   const yy0=Math.min(yb,cy),hh0=Math.abs(cy-yb);
+   vc.beginPath();vc.roundRect(xb-bw/2,yy0,bw,hh0,3);vc.fill();
+   vc.shadowColor=bcol;vc.shadowBlur=8;
+   /* api bayangan selalu di ujung terjauh dari sumbu */
+   const gl=yb+(hp>0?-4:4);
+   vc.beginPath();vc.arc(xb,gl,4,0,7);vc.fill();
+   vc.restore();
+   vc.fillStyle=bcol;vc.font='10px JetBrains Mono';vc.textAlign='center';
+   const stat=(sp>0?'NYATA':'MAYA')+', '+(hp>0?'TEGAK':'TERBALIK')+', '+cc.size;
+   vc.fillText('s′='+fmt(sp,2)+'m'+(Math.abs(sp)>40?' →':''),xb,cy+(hp>0?-14:28));
+   vc.fillText(stat+(clipped?' *':''),xb,cy+(hp>0?-28:42));
+   if(clipped){vc.fillStyle='rgba(255,196,107,.85)';vc.font='9px JetBrains Mono';
+    vc.fillText('* sebagian di luar bingkai (nilai aktual di HUD)',xb,cy+(hp>0?-42:56))}
+  }else{
+   vc.fillStyle='rgba(237,242,252,.85)';vc.font='11px JetBrains Mono';vc.textAlign='left';
+   vc.fillText('s = f → sinar pantul SEJAJAR → bayangan di tak hingga (s′ = ∞)',axL+20,cy-24);
+  }
+  vc.globalAlpha=1;
+ }
  drawScaleBar(186,H-30,scale,c1)}
+
+/* ============================================================
+   AUTO-POSITION: parkirkan konsol analisis di zona kanvas
+   yang paling kosong (diukur dari piksel terang scene)
+   ============================================================ */
+export function positionConsole(){
+ const c=document.getElementById('console');if(!c)return;
+ c.classList.add('show');
+ const cw=c.offsetWidth||440,ch=c.offsetHeight||160;
+ const W=innerWidth,H=innerHeight;
+ const slots=[
+  ['tengah-atas',(W-cw)/2,64],
+  ['kiri-atas',110,64],
+  ['kanan-atas',W-cw-110,64],
+  ['kiri-tengah',150,clamp((H-ch)/2,64,Math.max(H-ch-130,64))],
+  ['kanan-tengah',W-cw-150,clamp((H-ch)/2,64,Math.max(H-ch-130,64))],
+  ['kiri-bawah',150,Math.max(H-ch-120,64)],
+  ['kanan-bawah',W-cw-150,Math.max(H-ch-120,64)]
+ ];
+ let best=slots[0],bestScore=Infinity;
+ for(const s of slots){
+  const sc=busyScore(s[1],s[2],cw,Math.min(ch,180));
+  if(sc<bestScore){bestScore=sc;best=s}
+  if(bestScore===0)break;
+ }
+ c.style.left=Math.round(clamp(best[1],8,W-cw-8))+'px';
+ c.style.top=Math.round(clamp(best[2],8,H-ch-8))+'px';
+}
+function busyScore(x,y,w,h){
+ try{
+  if(!vc)return 999;
+  const d=devicePixelRatio||1;
+  const sx=Math.max(0,Math.round(x*d)),sy=Math.max(0,Math.round(y*d));
+  const sw=Math.min(Math.round(w*d),vp.width-sx),sh=Math.min(Math.round(h*d),vp.height-sy);
+  if(sw<20||sh<20)return 999;
+  const px=vc.getImageData(sx,sy,sw,sh).data;
+  let hits=0;
+  for(let i=0;i<px.length;i+=16){
+   const lum=px[i]*0.3+px[i+1]*0.5+px[i+2]*0.2;
+   if(px[i+3]>40&&lum>100)hits++;
+  }
+  return hits;
+ }catch(e){return 999}
+}

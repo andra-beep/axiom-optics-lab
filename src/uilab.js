@@ -1,11 +1,11 @@
 /* ============================================================
-   AXIOM | uilab.js — popover, drawer parameter, daftar & preset
+   AXIOM | uilab.js — popover, drawer parameter, sinar istimewa
    ============================================================ */
-import {$,fmt,sfx,store,toast,showOvl} from './core.js';
-import {EXPS,EXPIDS,MODULES,LASERS} from './config.js';
-import {S,P} from './state.js';
+import {$,fmt,clamp,sfx,store,toast,showOvl,RAD} from './core.js';
+import {EXPS,EXPIDS,MODULES,LASERS,DEF} from './config.js';
+import {S} from './state.js';
 import {resetRun,updateHUD} from './engine.js';
-import {renderCalc,renderAIHead} from './panels.js';
+import {renderCalc,renderAIHead,renderHist} from './panels.js';
 
 export function togglePop(id){const el=$(id),was=el.classList.contains('show');
  document.querySelectorAll('.pop').forEach(p=>p.classList.remove('show'));
@@ -21,7 +21,7 @@ export function renderExpList(){
  $('expList').innerHTML=EXPIDS.map(id=>{const e=EXPS[id];
   return`<button class="mi ${id===S.exp?'on':''}" data-e="${id}">
    <span class="ic">${e.icon}</span><span><b>${e.name}</b>
-   <small>eksperimen ${EXPIDS.indexOf(id)+1} dari 7</small></span><span class="dot"></span></button>`}).join('');
+   <small>eksperimen ${EXPIDS.indexOf(id)+1} dari ${EXPIDS.length}</small></span><span class="dot"></span></button>`}).join('');
  [...$('expList').children].forEach(b=>b.onclick=()=>{setExp(b.dataset.e);togglePop('pMode')});
  $('soonList').innerHTML=MODULES.slice(1).map(m=>`
   <button class="mi" onclick="toast('Modul ${m.name} sedang dibangun 🔒')">
@@ -39,11 +39,35 @@ export function applyLaser(){const e=LASERS.find(x=>x.id===S.laser);
 export function renderParams(){
  const ps=EXPS[S.exp].params;
  $('paramList').innerHTML=ps.map(p=>`
-  <div class="prow"><label>${p.l} <b><span id="pv_${p.k}">${fmt(P()[p.k],p.step<1?1:0)}</span> ${p.u}</b></label>
-  <input type="range" id="ps_${p.k}" min="${p.min}" max="${p.max}" step="${p.step}" value="${P()[p.k]}"></div>`).join('');
+  <div class="prow"><label>${p.l} <b><span id="pv_${p.k}">${fmt(S.p[S.exp][p.k],p.step<1?1:0)}</span> ${p.u}</b></label>
+  <input type="range" id="ps_${p.k}" min="${p.min}" max="${p.max}" step="${p.step}" value="${S.p[S.exp][p.k]}"></div>`).join('');
  ps.forEach(p=>{$('ps_'+p.k).oninput=e=>{
-  P()[p.k]=+e.target.value;$('pv_'+p.k).textContent=fmt(e.target.value,p.step<1?1:0);
-  resetRun(true);updateHUD()}})}
+  S.p[S.exp][p.k]=+e.target.value;$('pv_'+p.k).textContent=fmt(e.target.value,p.step<1?1:0);
+  resetRun(true);updateHUD()}});
+ /* tombol 3 sinar istimewa — hanya bila eksperimen punya parameter sudut */
+ if(ps.some(pp=>pp.k==='ang')){
+  const d=document.createElement('div');d.className='prow';
+  d.innerHTML=`<label style="margin-bottom:4px">SINAR ISTIMEWA</label>
+   <div style="display:flex;flex-direction:column;gap:6px">
+    <button class="mbtn" style="width:100%">∥ Sejajar sumbu utama</button>
+    <button class="mbtn" style="width:100%">🎯 Melalui titik F</button>
+    <button class="mbtn" style="width:100%">⭕ Melalui titik R (C)</button>
+   </div>`;
+  const bs=d.querySelectorAll('button');
+  bs[0].onclick=()=>setRayAngle(0);
+  bs[1].onclick=()=>setRayAngle('F');
+  bs[2].onclick=()=>setRayAngle('C');
+  $('paramList').appendChild(d)}}
+export function setRayAngle(m){
+ const p=S.p[S.exp];if(!p||p.ang===undefined)return;
+ let v=0,label='sejajar sumbu utama';
+ if(m==='F'){if(p.s<=p.R/2){toast('Butuh s > f agar sinar melalui F');return}
+  v=Math.atan2(p.h,p.s-p.R/2)*RAD;label='melalui titik F'}
+ if(m==='C'){if(p.s<=p.R){toast('Butuh s > R agar sinar melalui C');return}
+  v=Math.atan2(p.h,p.s-p.R)*RAD;label='melalui titik R (C)'}
+ p.ang=Math.round(clamp(v,0,85));
+ resetRun(true);renderParams();updateHUD();
+ toast('Sinar datang diatur '+label);sfx.param()}
 export function renderOverlays(){
  $('ovlList').innerHTML='';
  EXPS[S.exp].overlays.forEach(([l,k])=>{
@@ -53,26 +77,18 @@ export function renderOverlays(){
   d.querySelector('button').onclick=()=>{S.o[k]=!S.o[k];renderOverlays();sfx.click();updateHUD()};
   $('ovlList').appendChild(d)})}
 export function renderPresets(){
- const show=S.exp==='APLIKASI';
- $('presetSec').style.display=show?'block':'none';
- const tanOk=['CEKUNG','CEMBUNG','KUANTA','APLIKASI'].includes(S.exp);
- $('tanSec').style.display=tanOk?'block':'none';
- if(!show)return;
- $('presetRow').innerHTML=[['spion','🚗 Spion'],['reflektor','🔦 Reflektor'],['teleskop','🔭 Teleskop']]
-  .map(([k,l])=>`<button class="${S.preset===k?'on':''}" data-p="${k}">${l}</button>`).join('');
- [...$('presetRow').children].forEach(b=>b.onclick=()=>applyPreset(b.dataset.p))}
-export function applyPreset(k){
- S.preset=k;renderPresets();
- if(k==='spion'){Object.assign(S.p.APLIKASI,{R:4,s:6,h:1.5});toast('Spion: cembung — bayangan maya diperkecil, bidang pandang luas')}
- if(k==='reflektor'){Object.assign(S.p.APLIKASI,{R:6,s:3,h:1});toast('Reflektor: sumber tepat di F → pantulan SEJAJAR')}
- if(k==='teleskop'){Object.assign(S.p.APLIKASI,{R:10,s:30,h:5});toast('Teleskop: benda sangat jauh → bayangan kecil dekat F')}
- resetRun(true);updateHUD();renderParams()}
+ $('presetSec').style.display='none';
+ $('tanSec').style.display='none'}
+export function resetParams(){
+ Object.assign(S.p[S.exp],JSON.parse(JSON.stringify(DEF[S.exp])));
+ resetRun(true);renderParams();updateHUD();
+ toast('Semua parameter dikembalikan ke nilai awal');sfx.param()}
 export function setExp(id,silent){
  S.exp=id;resetRun(true);
- renderExpList();renderParams();renderOverlays();renderPresets();renderCalc();renderAIHead();
+ renderExpList();renderParams();renderOverlays();renderPresets();renderCalc();renderAIHead();renderHist();
  updateHUD();$('console').classList.remove('show');
- if(!silent){toast('Eksperimen: '+EXPS[id].name);sfx.param()}}
-
+ if(!silent){toast('Eksperimen: '+EXPS[id].name);sfx.param();
+  if(!store.get('tut_'+id,false)){store.set('tut_'+id,true);setTimeout(showTutor,650)}}}
 export function showTutor(){
  $('tutTitle').textContent='Tutorial — '+EXPS[S.exp].name;
  $('tutText').textContent=EXPS[S.exp].tutorial;
